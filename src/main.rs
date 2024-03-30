@@ -2,7 +2,6 @@ use std::collections::HashMap;
 use std::env::args;
 use std::fs::File;
 use std::io::{BufRead, BufReader, Read, Seek, SeekFrom};
-use std::thread::spawn;
 
 struct Station {
     cnt: u32,
@@ -60,7 +59,7 @@ where
 
 fn get_ranges(mut f: File) -> Vec<(u64, u64)> {
     let len = f.metadata().unwrap().len();
-    let slice_count = std::thread::available_parallelism().unwrap().get() as u64;
+    let slice_count = len / (10 * 1024 * 1024);
     let mut buf = [0u8; 256];
 
     let positions: Vec<u64> = (0 ..= slice_count).map(|n| {
@@ -93,6 +92,8 @@ fn merge_stats(mut a: HashMap<String, Station>, b: HashMap<String, Station>) -> 
 }
 
 fn main() {
+    use rayon::prelude::*;
+
     let src = args()
         .skip(1)
         .next()
@@ -100,22 +101,14 @@ fn main() {
 
     let ranges = get_ranges(File::open(&src).unwrap());
 
-    let threads: Vec<_> = ranges.into_iter()
+    let stations = ranges.into_par_iter()
         .map(| (offset, len) | {
-            let src = src.to_string();
-            spawn(move || {
-                let mut f = File::open(&src).unwrap();
-                f.seek(SeekFrom::Start(offset)).unwrap();
-                let subset = f.take(len);
-                find_stats(subset)
-            })
+            let mut f = File::open(&src).unwrap();
+            f.seek(SeekFrom::Start(offset)).unwrap();
+            let subset = f.take(len);
+            find_stats(subset)
         })
-        .collect();
-
-    let stations = threads.into_iter()
-        .map(|t| t.join().unwrap())
-        .reduce(merge_stats)
-        .unwrap();
+        .reduce_with(merge_stats).unwrap();
 
     let mut keys: Vec<String> = stations.keys().map(|x| x.to_string()).collect();
     keys.sort();
