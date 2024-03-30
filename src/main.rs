@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 use std::env::args;
 use std::fs::File;
-use std::io::{BufRead, BufReader};
+use std::io::{BufRead, BufReader, Read};
 
 struct Station {
     count: u32,
@@ -21,13 +21,10 @@ impl Station {
     }
 }
 
-fn main() {
-    let src = args()
-        .skip(1)
-        .next()
-        .unwrap_or_else(|| "measurements.txt".to_string());
-
-    let f = File::open(&src).unwrap();
+fn find_stats<T>(f: T) -> HashMap<String, Station>
+where
+    T: Read,
+{
     let reader = BufReader::new(f);
 
     let mut stations: HashMap<String, Station> = HashMap::new();
@@ -49,6 +46,19 @@ fn main() {
             stations.insert(name, Station::new(value));
         }
     }
+
+    stations
+}
+
+fn main() {
+    let src = args()
+        .skip(1)
+        .next()
+        .unwrap_or_else(|| "measurements.txt".to_string());
+
+    let f = File::open(&src).unwrap();
+
+    let stations = find_stats(&f);
 
     let mut keys: Vec<String> = stations.keys().map(|x| x.to_string()).collect();
     keys.sort();
