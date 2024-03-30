@@ -2,6 +2,7 @@ use std::collections::HashMap;
 use std::env::args;
 use std::fs::File;
 use std::io::{BufRead, BufReader, Read, Seek, SeekFrom};
+use std::time::Instant;
 
 struct Station {
     cnt: u32,
@@ -120,12 +121,16 @@ fn merge_stats(
 fn main() {
     use rayon::prelude::*;
 
+    let start = Instant::now();
+
     let src = args()
         .skip(1)
         .next()
         .unwrap_or_else(|| "measurements.txt".to_string());
 
     let ranges = get_ranges(File::open(&src).unwrap());
+
+    let ranges_found = Instant::now();
 
     let stations = ranges
         .into_par_iter()
@@ -137,6 +142,8 @@ fn main() {
         })
         .reduce_with(merge_stats)
         .unwrap();
+
+    let aggregated = Instant::now();
 
     let mut keys: Vec<String> = stations.keys().map(|x| x.to_string()).collect();
     keys.sort();
@@ -153,6 +160,16 @@ fn main() {
             station.cnt
         );
     }
+
+    let printed = Instant::now();
+
+    let prep_duration = ranges_found.duration_since(start);
+    let aggregation_duration = aggregated.duration_since(ranges_found);
+    let printout_duration = printed.duration_since(aggregated);
+
+    println!("Prep: {:?}", prep_duration);
+    println!("Aggr: {:?}", aggregation_duration);
+    println!("Prnt: {:?}", printout_duration);
 }
 
 #[cfg(test)]
