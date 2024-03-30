@@ -40,16 +40,11 @@ fn main() {
             (name.to_string(), value.parse::<f32>().unwrap())
         };
 
-        if let Some(station) = stations.get(&name) {
-            stations.insert(
-                name,
-                Station {
-                    count: station.count + 1,
-                    sum: station.sum + value,
-                    min: station.min.min(value),
-                    max: station.max.max(value),
-                },
-            );
+        if let Some(station) = stations.get_mut(&name) {
+            station.count += 1;
+            station.sum += value;
+            station.min = station.min.min(value);
+            station.max = station.max.max(value);
         } else {
             stations.insert(name, Station::new(value));
         }
